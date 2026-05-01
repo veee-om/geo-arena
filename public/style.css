@@ -265,10 +265,7 @@ button:disabled {
 }
 
 .bottom-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+  display: block;
   margin-top: 18px;
   padding: 20px 24px;
 }
