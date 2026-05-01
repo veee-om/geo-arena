@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Real-time multiplayer India location guessing game built with Express, Socket.IO, and Leaflet.",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js"
   },

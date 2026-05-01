@@ -18,10 +18,29 @@
       <section id="lobby-screen" class="screen active">
         <div class="lobby-card">
           <p class="eyebrow">Real-time multiplayer map challenge</p>
-          <h1>GeoArena India</h1>
-          <p class="subtitle">Create a room, invite friends, and guess cities across India.</p>
+          <h1>GeoArena India by Veee</h1>
+          <p class="subtitle">Join a room, wait in the lobby, then race to pinpoint real cities and towns across India.</p>
+
+          <div class="how-to-play-card">
+            <h3>How to Play</h3>
+            <ol>
+              <li>Enter your player name, create a room, or join one with a room code.</li>
+              <li>Wait in the lobby until the host starts the round.</li>
+              <li>Click the map, submit your guess, and score by guessing closer.</li>
+            </ol>
+          </div>
 
           <div class="lobby-actions">
+            <div class="join-card">
+              <label for="player-name-input">Player Name</label>
+              <input
+                id="player-name-input"
+                type="text"
+                maxlength="24"
+                placeholder="Enter your name"
+                autocomplete="off"
+              />
+            </div>
             <button id="create-room-btn" class="primary-btn">Create Room</button>
             <div class="join-card">
               <label for="room-code-input">Room Code</label>
@@ -40,6 +59,25 @@
         </div>
       </section>
 
+      <section id="room-screen" class="screen">
+        <div class="room-card">
+          <p class="eyebrow">Lobby</p>
+          <h2>GeoArena India by Veee</h2>
+          <p class="room-code-display">Room ID: <span id="room-code-big">------</span></p>
+          <p id="room-waiting-text" class="subtitle">Share this room code and wait for players to join.</p>
+
+          <div class="room-player-panel">
+            <h3>Players in Room</h3>
+            <div id="room-player-list" class="player-list"></div>
+          </div>
+
+          <div class="room-actions">
+            <button id="room-start-btn" class="primary-btn">Start Game</button>
+            <p id="room-host-note" class="guess-status"></p>
+          </div>
+        </div>
+      </section>
+
       <section id="game-screen" class="screen">
         <div class="game-topbar">
           <div>
@@ -49,7 +87,6 @@
           </div>
           <div class="topbar-actions">
             <div class="timer-pill">Time Left: <span id="timer-display">30</span>s</div>
-            <button id="start-game-btn" class="primary-btn">Start Game</button>
           </div>
         </div>
 
@@ -82,6 +119,7 @@
           </div>
 
           <button id="next-round-btn" class="primary-btn">Next Round</button>
+          <p id="results-host-note" class="guess-status"></p>
         </div>
       </section>
     </div>

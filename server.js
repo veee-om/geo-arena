@@ -15,8 +15,10 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 const ROUND_DURATION_SECONDS = 30;
+const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
+const LOCATION_CACHE_TTL_MS = 1000 * 60 * 60 * 6;
 
-const LOCATIONS = [
+const FALLBACK_LOCATIONS = [
   { name: "Mumbai", lat: 19.076, lng: 72.8777 },
   { name: "Delhi", lat: 28.6139, lng: 77.209 },
   { name: "Bangalore", lat: 12.9716, lng: 77.5946 },
@@ -26,6 +28,11 @@ const LOCATIONS = [
 ];
 
 const rooms = {};
+const locationCache = {
+  locations: [],
+  fetchedAt: 0,
+  pending: null
+};
 
 app.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
@@ -70,9 +77,27 @@ function getRoomJoinPayload(room, socketId) {
     playerId: socketId,
     players: getPlayersPayload(room),
     round: room.round,
+    hostId: room.hostId,
     gameActive: room.gameActive,
     timeLeft: room.timeLeft,
     locationName: room.currentLocation ? room.currentLocation.name : null
+  };
+}
+
+function normalizePlayerName(name, fallback) {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  return trimmed.slice(0, 24);
+}
+
+function createPlayerWithName(socketId, playerNumber, playerName) {
+  const fallbackName = `Player ${playerNumber}`;
+  return {
+    ...createPlayer(socketId, playerNumber),
+    name: normalizePlayerName(playerName, fallbackName)
   };
 }
 
@@ -115,7 +140,9 @@ function broadcastRoomState(roomCode) {
   io.to(roomCode).emit("roomUpdate", {
     roomCode,
     players: getPlayersPayload(room),
-    round: room.round
+    round: room.round,
+    hostId: room.hostId,
+    gameActive: room.gameActive
   });
 }
 
@@ -123,6 +150,94 @@ function clearRoomTimer(room) {
   if (room.timer) {
     clearInterval(room.timer);
     room.timer = null;
+  }
+}
+
+async function fetchIndiaLocations() {
+  const cacheIsFresh =
+    locationCache.locations.length > 0 &&
+    Date.now() - locationCache.fetchedAt < LOCATION_CACHE_TTL_MS;
+
+  if (cacheIsFresh) {
+    return locationCache.locations;
+  }
+
+  if (locationCache.pending) {
+    return locationCache.pending;
+  }
+
+  const query = `
+    [out:json][timeout:25];
+    area["name"="India"]["boundary"="administrative"]["admin_level"="2"]->.searchArea;
+    (
+      node["place"="city"](area.searchArea);
+      node["place"="town"](area.searchArea);
+    );
+    out body;
+  `;
+
+  locationCache.pending = fetch(OVERPASS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+    },
+    body: `data=${encodeURIComponent(query)}`
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Overpass request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      const seen = new Set();
+      const parsedLocations = (data.elements || [])
+        .filter((element) => {
+          return (
+            element &&
+            typeof element.lat === "number" &&
+            typeof element.lon === "number" &&
+            element.tags &&
+            typeof element.tags.name === "string" &&
+            (element.tags.place === "city" || element.tags.place === "town")
+          );
+        })
+        .map((element) => ({
+          name: element.tags.name,
+          lat: element.lat,
+          lng: element.lon
+        }))
+        .filter((location) => {
+          const key = `${location.name}:${location.lat}:${location.lng}`;
+          if (seen.has(key)) {
+            return false;
+          }
+
+          seen.add(key);
+          return true;
+        });
+
+      if (parsedLocations.length === 0) {
+        throw new Error("Overpass returned no usable India locations.");
+      }
+
+      locationCache.locations = parsedLocations;
+      locationCache.fetchedAt = Date.now();
+      return parsedLocations;
+    })
+    .finally(() => {
+      locationCache.pending = null;
+    });
+
+  return locationCache.pending;
+}
+
+async function getRoundLocation() {
+  try {
+    const locations = await fetchIndiaLocations();
+    return locations[Math.floor(Math.random() * locations.length)];
+  } catch (error) {
+    console.error("Falling back to hardcoded locations:", error.message);
+    return FALLBACK_LOCATIONS[Math.floor(Math.random() * FALLBACK_LOCATIONS.length)];
   }
 }
 
@@ -176,7 +291,7 @@ function finishRound(roomCode) {
   broadcastRoomState(roomCode);
 }
 
-function startRound(roomCode) {
+async function startRound(roomCode) {
   const room = rooms[roomCode];
   if (!room || Object.keys(room.players).length === 0) {
     return;
@@ -185,7 +300,7 @@ function startRound(roomCode) {
   clearRoomTimer(room);
 
   room.round += 1;
-  room.currentLocation = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+  room.currentLocation = await getRoundLocation();
   room.guesses = {};
   room.gameActive = true;
   room.timeLeft = ROUND_DURATION_SECONDS;
@@ -221,10 +336,11 @@ function startRound(roomCode) {
 }
 
 io.on("connection", (socket) => {
-  socket.on("createRoom", () => {
+  socket.on("createRoom", ({ playerName }) => {
     const roomCode = generateRoomCode();
     const room = {
       code: roomCode,
+      hostId: socket.id,
       players: {},
       guesses: {},
       round: 0,
@@ -234,7 +350,7 @@ io.on("connection", (socket) => {
       timer: null
     };
 
-    const player = createPlayer(socket.id, 1);
+    const player = createPlayerWithName(socket.id, 1, playerName);
     room.players[socket.id] = player;
     rooms[roomCode] = room;
 
@@ -245,7 +361,7 @@ io.on("connection", (socket) => {
     broadcastRoomState(roomCode);
   });
 
-  socket.on("joinRoom", ({ roomCode }) => {
+  socket.on("joinRoom", ({ roomCode, playerName }) => {
     const normalizedCode = String(roomCode || "").trim().toUpperCase();
     const room = rooms[normalizedCode];
 
@@ -254,7 +370,16 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const player = createPlayer(socket.id, Object.keys(room.players).length + 1);
+    if (room.gameActive) {
+      socket.emit("errorMessage", "A round is already active. Join after this round ends.");
+      return;
+    }
+
+    const player = createPlayerWithName(
+      socket.id,
+      Object.keys(room.players).length + 1,
+      playerName
+    );
     room.players[socket.id] = player;
 
     socket.join(normalizedCode);
@@ -264,7 +389,7 @@ io.on("connection", (socket) => {
     broadcastRoomState(normalizedCode);
   });
 
-  socket.on("startGame", ({ roomCode }) => {
+  socket.on("startGame", async ({ roomCode }) => {
     const normalizedCode = String(roomCode || "").trim().toUpperCase();
     const room = rooms[normalizedCode];
 
@@ -278,7 +403,17 @@ io.on("connection", (socket) => {
       return;
     }
 
-    startRound(normalizedCode);
+    if (!room.players[socket.id]) {
+      socket.emit("errorMessage", "You are not a member of this room.");
+      return;
+    }
+
+    if (socket.id !== room.hostId) {
+      socket.emit("errorMessage", "Only the room host can start the game.");
+      return;
+    }
+
+    await startRound(normalizedCode);
   });
 
   socket.on("submitGuess", ({ roomCode, lat, lng }) => {
@@ -327,6 +462,10 @@ io.on("connection", (socket) => {
         clearRoomTimer(room);
         delete rooms[roomCode];
         return;
+      }
+
+      if (room.hostId === socket.id) {
+        room.hostId = Object.keys(room.players)[0];
       }
 
       if (room.gameActive) {
