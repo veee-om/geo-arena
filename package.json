@@ -1,0 +1,23 @@
+{
+  "name": "geoarena-india-by-veeee",
+  "version": "1.0.0",
+  "description": "Real-time multiplayer India location guessing game built with Express, Socket.IO, and Leaflet.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "game",
+    "multiplayer",
+    "socket.io",
+    "leaflet",
+    "india"
+  ],
+  "author": "Veee",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}

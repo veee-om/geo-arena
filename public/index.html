@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GeoArena India by Veee</title>
+    <link rel="preconnect" href="https://unpkg.com" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <section id="lobby-screen" class="screen active">
+        <div class="lobby-card">
+          <p class="eyebrow">Real-time multiplayer map challenge</p>
+          <h1>GeoArena India</h1>
+          <p class="subtitle">Create a room, invite friends, and guess cities across India.</p>
+
+          <div class="lobby-actions">
+            <button id="create-room-btn" class="primary-btn">Create Room</button>
+            <div class="join-card">
+              <label for="room-code-input">Room Code</label>
+              <input
+                id="room-code-input"
+                type="text"
+                maxlength="6"
+                placeholder="ABCDEF"
+                autocomplete="off"
+              />
+              <button id="join-room-btn" class="secondary-btn">Join Room</button>
+            </div>
+          </div>
+
+          <p id="status-message" class="status-message"></p>
+        </div>
+      </section>
+
+      <section id="game-screen" class="screen">
+        <div class="game-topbar">
+          <div>
+            <p class="eyebrow">Room <span id="room-code-label">------</span></p>
+            <h2 id="round-label">Waiting for round</h2>
+            <p id="prompt-label" class="subtitle">Start a game to receive your India location prompt.</p>
+          </div>
+          <div class="topbar-actions">
+            <div class="timer-pill">Time Left: <span id="timer-display">30</span>s</div>
+            <button id="start-game-btn" class="primary-btn">Start Game</button>
+          </div>
+        </div>
+
+        <div class="game-layout">
+          <aside class="sidebar">
+            <h3>Players</h3>
+            <div id="player-list" class="player-list"></div>
+          </aside>
+
+          <main class="map-panel">
+            <div id="map"></div>
+          </main>
+        </div>
+
+        <div class="bottom-bar">
+          <p id="guess-status" class="guess-status">Click anywhere on the map to place your guess.</p>
+          <button id="submit-guess-btn" class="primary-btn" disabled>Submit Guess</button>
+        </div>
+      </section>
+
+      <section id="results-screen" class="screen">
+        <div class="results-card">
+          <p class="eyebrow">Round Complete</p>
+          <h2 id="result-location">Location: -</h2>
+          <p id="distance-label" class="distance-label">Your distance: -</p>
+
+          <div class="leaderboard-card">
+            <h3>Leaderboard</h3>
+            <div id="leaderboard" class="leaderboard"></div>
+          </div>
+
+          <button id="next-round-btn" class="primary-btn">Next Round</button>
+        </div>
+      </section>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/main.js"></script>
+  </body>
+</html>
